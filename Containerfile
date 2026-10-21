@@ -34,10 +34,14 @@ COPY openapi/ openapi/
 #     go wrong when it is absent.
 #
 # The path is where the `maven` task's maven-generate step writes it:
-# <workspace>/<subdirectory>/maven-generate/settings.xml, and buildah's build
-# context is that same <subdirectory>. When it is absent -- a plain
-# `podman build` of a fresh clone -- this falls back to Central, so the
-# Containerfile stays buildable outside the pipeline.
+# <workspace>/<subdirectory>/maven-generate/settings.xml. buildah-rhtap builds
+# with a context of <workspace>/source, which it HARDCODES rather than reading
+# the pipeline's `subdirectory` param -- so the two line up only while that
+# param keeps its default of `source`. Change it and this quietly falls back to
+# Central instead of failing, which is the failure mode to remember.
+#
+# When the file is absent -- a plain `podman build` of a fresh clone -- the
+# fallback keeps the Containerfile buildable outside the pipeline.
 #
 # -DskipTests stays: the pipeline's `package` task already ran them, and a
 # second run here would only slow the build down.
