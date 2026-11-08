@@ -1,6 +1,8 @@
 package com.redhat.lightwell.service;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import com.redhat.lightwell.exception.ResourceNotFoundException;
 import com.redhat.lightwell.model.Customer;
@@ -11,11 +13,15 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class CreditCheckService {
+
+    private static final Logger log = LoggerFactory.getLogger(CreditCheckService.class);
 
     private final CustomerRepository customerRepository;
     private final AuditService auditService;
@@ -32,8 +38,16 @@ public class CreditCheckService {
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", customerId));
 
-        String url = creditCheckUrl + "?name=" + customer.getFirstName() + " " + customer.getLastName()
-                + "&email=" + customer.getEmail();
+        // The query values are user data (names contain spaces) and MUST be
+        // encoded: with a raw space the whole URI is illegal and HttpGet
+        // throws IllegalArgumentException before any network I/O, so the
+        // catch below silently fell back to the hash-based score -- the
+        // external bureau was never called for any customer whose name has
+        // a space (i.e., all of them). Found by
+        // agentic-test-generation-integration-issue-fpc8f.
+        String url = creditCheckUrl + "?name="
+                + URLEncoder.encode(customer.getFirstName() + " " + customer.getLastName(), StandardCharsets.UTF_8)
+                + "&email=" + URLEncoder.encode(customer.getEmail(), StandardCharsets.UTF_8);
 
         int score;
         String status;
@@ -54,6 +68,11 @@ public class CreditCheckService {
                 }
             }
         } catch (Exception e) {
+            // This used to be silent -- a swallowed exception here is why a
+            // broken credit-check URL looked like a deterministic fallback
+            // score and took 12 agent attempts to diagnose.
+            log.warn("Credit check for customer {} ({}) failed, using fallback score: {}",
+                    customerId, customer.getEmail(), e.toString());
             score = generateFallbackScore(customer);
             status = score >= 700 ? "GOOD" : score >= 500 ? "FAIR" : "POOR";
         }
