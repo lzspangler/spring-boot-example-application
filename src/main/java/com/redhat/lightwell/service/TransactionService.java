@@ -129,6 +129,12 @@ public class TransactionService {
         return toResponse(sourceTxn);
     }
 
+    // readOnly: the stream().map(toResponse) below dereferences the lazy
+    // Transaction.account proxy, and the app runs with
+    // spring.jpa.open-in-view=false -- without a session here, any account
+    // with transaction history answers 500 with LazyInitializationException.
+    // deposit/withdraw need write semantics; this method only reads.
+    @Transactional(readOnly = true)
     public List<TransactionResponse> getTransactionHistory(Long accountId) {
         if (!accountRepository.existsById(accountId)) {
             throw new ResourceNotFoundException("Account", accountId);
