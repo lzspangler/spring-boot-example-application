@@ -26,6 +26,10 @@
         <springdoc.version>1.7.0</springdoc.version>
         <jsonpath.version>2.7.0</jsonpath.version>
         <plexus-utils.version>4.0.1</plexus-utils.version>
+        <!-- Versions for test‑only dependencies -->
+        <rest-assured.version>5.3.0</rest-assured.version>
+        <jsonassert.version>1.5.1</jsonassert.version>
+        <failsafe.plugin.version>3.0.0-M7</failsafe.plugin.version>
     </properties>
 
     <dependencies>
@@ -144,6 +148,20 @@
             <version>2.35.0</version>
             <scope>test</scope>
         </dependency>
+        <!-- REST‑Assured for functional (black‑box) tests -->
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
+            <scope>test</scope>
+            <version>${rest-assured.version}</version>
+        </dependency>
+        <!-- JSONAssert for response body validation -->
+        <dependency>
+            <groupId>org.skyscreamer</groupId>
+            <artifactId>jsonassert</artifactId>
+            <scope>test</scope>
+            <version>${jsonassert.version}</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -203,6 +221,65 @@
                     </configOptions>
                 </configuration>
             </plugin>
+            <!-- Failsafe plugin for functional tests (FT.java) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>${failsafe.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <includes>
+                        <include>**/*FT.java</include>
+                    </includes>
+                    <systemPropertyVariables>
+                        <!-- Pass through environment variables if they are set -->
+                        <APP_BASE_URL>${env.APP_BASE_URL}</APP_BASE_URL>
+                        <APP_USERNAME>${env.APP_USERNAME}</APP_USERNAME>
+                        <APP_PASSWORD>${env.APP_PASSWORD}</APP_PASSWORD>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
+    <!-- Functional profile – activated by the CI when running functional tests -->
+    <profiles>
+        <profile>
+            <id>functional</id>
+            <activation>
+                <property>
+                    <name>functional</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <version>${failsafe.plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <includes>
+                                <include>**/*FT.java</include>
+                            </includes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
